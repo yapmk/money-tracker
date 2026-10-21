@@ -6,8 +6,14 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "plugins": ["expo-router"],
-    "ios": { "supportsTablet": true },
+    "plugins": [
+      "expo-router",
+      "expo-sharing",
+      "@react-native-community/datetimepicker"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
     "android": {},
     "web": {}
   }

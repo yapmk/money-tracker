@@ -1,5 +1,11 @@
-import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import {
   Button,
   Chip,
@@ -8,18 +14,63 @@ import {
   Snackbar,
   TextInput,
 } from 'react-native-paper';
-import { router } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { CATEGORIES } from '../constants/categories';
-import { useCreateTransaction } from '../hooks/useTransactions';
+import {
+  useCreateTransaction,
+  useUpdateTransaction,
+} from '../hooks/useTransactions';
 
-export default function AddTransactionScreen() {
+export default function TransactionFormScreen() {
+  const { id } = useLocalSearchParams();
+  const isEdit = !!id;
+  const qc = useQueryClient();
+
   const [type, setType] = useState('expense');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
+  const [date, setDate] = useState(new Date());
+  const [showPicker, setShowPicker] = useState(false);
   const [errors, setErrors] = useState({});
   const [snack, setSnack] = useState('');
+
   const createMutation = useCreateTransaction();
+  const updateMutation = useUpdateTransaction();
+
+  // Prefill in edit mode — search across all cached filter ranges
+  useEffect(() => {
+    if (!isEdit) return;
+    const all = qc.getQueriesData({ queryKey: ['transactions'] });
+    let existing = null;
+    for (const [, list] of all) {
+      if (Array.isArray(list)) {
+        const found = list.find((t) => t._id === id);
+        if (found) {
+          existing = found;
+          break;
+        }
+      }
+    }
+    if (existing) {
+      setType(existing.type);
+      setAmount(String(existing.amount));
+      setDescription(existing.description || '');
+      setCategory(existing.category);
+      if (existing.date) setDate(new Date(existing.date));
+    }
+  }, [isEdit, id, qc]);
+
+  const onValueChange = (_event, selectedDate) => {
+    if (selectedDate) setDate(selectedDate);
+    if (Platform.OS === 'android') setShowPicker(false);
+  };
+
+  const onDismiss = () => {
+    setShowPicker(false);
+  };
 
   const validate = () => {
     const next = {};
@@ -37,82 +88,154 @@ export default function AddTransactionScreen() {
   const onSubmit = async () => {
     if (!validate()) return;
 
+    const payload = {
+      type,
+      amount: Number(amount),
+      description: description.trim(),
+      category,
+      date: date.toISOString(),
+    };
+
     try {
-      await createMutation.mutateAsync({
-        type,
-        amount: Number(amount),
-        description: description.trim(),
-        category,
-        date: new Date().toISOString(),
-      });
+      if (isEdit) {
+        await updateMutation.mutateAsync({ id, ...payload });
+      } else {
+        await createMutation.mutateAsync(payload);
+      }
       router.back();
     } catch (err) {
-      setSnack(err?.response?.data?.message || 'Failed to save transaction');
+      setSnack(
+        err?.response?.data?.message ||
+          (isEdit
+            ? 'Failed to update transaction'
+            : 'Failed to save transaction'),
+      );
     }
   };
 
+  const isPending = createMutation.isPending || updateMutation.isPending;
+  const formattedDate = date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <SegmentedButtons
-        value={type}
-        onValueChange={setType}
-        buttons={[
-          { value: 'expense', label: 'Expense' },
-          { value: 'income', label: 'Income' },
-        ]}
+    <>
+      <Stack.Screen
+        options={{ title: isEdit ? 'Edit Transaction' : 'Add Transaction' }}
       />
+      <ScrollView contentContainerStyle={styles.container}>
+        <SegmentedButtons
+          value={type}
+          onValueChange={setType}
+          buttons={[
+            { value: 'expense', label: 'Expense' },
+            { value: 'income', label: 'Income' },
+          ]}
+        />
 
-      <TextInput
-        label="Amount"
-        value={amount}
-        onChangeText={setAmount}
-        keyboardType="numeric"
-        mode="outlined"
-        error={!!errors.amount}
-      />
-      <HelperText type="error" visible={!!errors.amount}>
-        {errors.amount}
-      </HelperText>
+        <TextInput
+          label="Amount"
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="numeric"
+          mode="outlined"
+          error={!!errors.amount}
+        />
+        <HelperText type="error" visible={!!errors.amount}>
+          {errors.amount}
+        </HelperText>
 
-      <TextInput
-        label="Description"
-        value={description}
-        onChangeText={setDescription}
-        mode="outlined"
-      />
+        <TextInput
+          label="Description"
+          value={description}
+          onChangeText={setDescription}
+          mode="outlined"
+        />
 
-      <View style={styles.chips}>
-        {CATEGORIES.map((c) => (
-          <Chip
-            key={c}
-            selected={category === c}
-            onPress={() => setCategory(c)}
+        {/* Date row */}
+        <View style={styles.dateRow}>
+          <Pressable
+            style={styles.dateField}
+            onPress={() => setShowPicker(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Date: ${formattedDate}`}
           >
-            {c}
-          </Chip>
-        ))}
-      </View>
-      <HelperText type="error" visible={!!errors.category}>
-        {errors.category}
-      </HelperText>
+            <View pointerEvents="none">
+              <TextInput
+                label="Date"
+                value={formattedDate}
+                mode="outlined"
+                editable={false}
+                right={<TextInput.Icon icon="calendar" />}
+              />
+            </View>
+          </Pressable>
+          <Button
+            mode="text"
+            compact
+            onPress={() => setDate(new Date())}
+            style={styles.todayBtn}
+          >
+            Today
+          </Button>
+        </View>
 
-      <Button
-        mode="contained"
-        onPress={onSubmit}
-        loading={createMutation.isPending}
-        disabled={createMutation.isPending}
-      >
-        Save
-      </Button>
+        {showPicker && (
+          <DateTimePicker
+            value={date}
+            mode="date"
+            onValueChange={onValueChange}
+            onDismiss={onDismiss}
+          />
+        )}
+        {showPicker && Platform.OS === 'ios' && (
+          <Button mode="text" compact onPress={() => setShowPicker(false)}>
+            Done
+          </Button>
+        )}
 
-      <Snackbar visible={!!snack} onDismiss={() => setSnack('')} duration={3000}>
-        {snack}
-      </Snackbar>
-    </ScrollView>
+        <View style={styles.chips}>
+          {CATEGORIES.map((c) => (
+            <Chip
+              key={c}
+              selected={category === c}
+              onPress={() => setCategory(c)}
+            >
+              {c}
+            </Chip>
+          ))}
+        </View>
+        <HelperText type="error" visible={!!errors.category}>
+          {errors.category}
+        </HelperText>
+
+        <Button
+          mode="contained"
+          onPress={onSubmit}
+          loading={isPending}
+          disabled={isPending}
+        >
+          {isEdit ? 'Save changes' : 'Save'}
+        </Button>
+
+        <Snackbar
+          visible={!!snack}
+          onDismiss={() => setSnack('')}
+          duration={3000}
+        >
+          {snack}
+        </Snackbar>
+      </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 8, paddingBottom: 32 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dateField: { flex: 1 },
+  todayBtn: { alignSelf: 'center' },
 });

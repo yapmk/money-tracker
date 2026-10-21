@@ -4,6 +4,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { ActivityIndicator, PaperProvider } from 'react-native-paper';
 import { View } from 'react-native';
 import { AuthProvider, useAuth } from '../features/auth/AuthContext';
+import { FilterProvider } from '../features/filters/FilterContext';
 
 const queryClient = new QueryClient();
 
@@ -35,7 +36,10 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="add-transaction" options={{ title: 'Add Transaction', headerShown: true }} />
+      <Stack.Screen
+        name="add-transaction"
+        options={{ title: 'Transaction', headerShown: true }}
+      />
       <Stack.Screen name="login" />
       <Stack.Screen name="signup" />
     </Stack>
@@ -47,7 +51,9 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <PaperProvider>
         <AuthProvider>
-          <RootLayoutNav />
+          <FilterProvider>
+            <RootLayoutNav />
+          </FilterProvider>
         </AuthProvider>
       </PaperProvider>
     </QueryClientProvider>

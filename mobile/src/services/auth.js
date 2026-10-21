@@ -22,3 +22,14 @@ export async function getToken() {
 export async function clearToken() {
   await SecureStore.deleteItemAsync('token');
 }
+
+// NEW
+export async function getMe() {
+  const { data } = await api.get('/api/auth/me');
+  return data;
+}
+
+export async function updateMe(patch) {
+  const { data } = await api.put('/api/auth/me', patch);
+  return data;
+}

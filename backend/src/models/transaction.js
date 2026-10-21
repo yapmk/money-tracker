@@ -1,19 +1,14 @@
 import mongoose from "mongoose";
 
 export const CATEGORIES = [
-  "Food",
-  "Drinks",
-  "Snack",
-  "Grocery",
-  "Shopee",
-  "Haircut",
-  "Rent",
-  "Telco",
-  "Subscription",
-  "Transpot",
-  "Events",
-  "Education",
-  "Other",
+  'Food',
+  'Transport',
+  'Shopping',
+  'Bills',
+  'Entertainment',
+  'Health',
+  'Salary',
+  'Other',
 ];
 
 const transactionSchema = new mongoose.Schema(

@@ -6,15 +6,36 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);     // blocks navigation (token read)
+  const [isUserLoading, setIsUserLoading] = useState(false); // profile fetch in progress
 
   useEffect(() => {
     (async () => {
       try {
         const stored = await authService.getToken();
-        if (stored) setToken(stored);
+        if (stored) {
+          setToken(stored);
+
+          // Background-hydrate the profile. Don't block app start —
+          // a slow / offline network should never freeze the app on cold boot.
+          setIsUserLoading(true);
+          authService
+            .getMe()
+            .then((me) => setUser(me))
+            .catch(async (err) => {
+              if (err?.response?.status === 401) {
+                // Token is no longer valid (user deleted, secret rotated, etc.)
+                await authService.clearToken();
+                setToken(null);
+                setUser(null);
+              }
+              // Any other error (network, timeout): leave user null.
+              // Profile screen exposes a retry button that calls refreshUser().
+            })
+            .finally(() => setIsUserLoading(false));
+        }
       } catch {
-        // no-op
+        // SecureStore read failed — treat as no token
       } finally {
         setIsLoading(false);
       }
@@ -37,6 +58,30 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+  const updateProfile = async (patch) => {
+    const updated = await authService.updateMe(patch);
+    setUser(updated);
+    return updated;
+  };
+
+  const refreshUser = async () => {
+    setIsUserLoading(true);
+    try {
+      const me = await authService.getMe();
+      setUser(me);
+      return me;
+    } catch (err) {
+      if (err?.response?.status === 401) {
+        await authService.clearToken();
+        setToken(null);
+        setUser(null);
+      }
+      throw err;
+    } finally {
+      setIsUserLoading(false);
+    }
+  };
+
   const signOut = async () => {
     try {
       await authService.clearToken();
@@ -48,7 +93,19 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        isLoading,
+        isUserLoading,
+        signIn,
+        signUp,
+        updateProfile,
+        refreshUser,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
