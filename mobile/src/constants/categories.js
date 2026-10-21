@@ -1,0 +1,15 @@
+export const CATEGORIES = [
+  'Food',
+  'Drinks',
+  'Snack',
+  'Grocery',
+  'Shopee',
+  'Haircut',
+  'Rent',
+  'Telco',
+  'Subscription',
+  'Transpot',
+  'Events',
+  'Education',
+  'Other',
+];
