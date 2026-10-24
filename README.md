@@ -24,6 +24,11 @@ Add income and expenses, view charts, filter by period, export to Excel, and sha
 - Edit profile (name, password)
 - Per-user data isolation
 
+<p align="center">
+  <img src="screenshot.jpg" width="20%" align="left" />
+</p>
+<br clear="all" />
+
 ---
 
 ## Setup
@@ -97,15 +102,6 @@ All `/api/transactions` routes require `Authorization: Bearer <token>`.
 6. `npx expo start --clear`.
 
 > **Free tier:** 30–50s cold start after 15min idle. Keep warm with a free cron on `https://<render-url>/` every 10 minutes.
-
----
-
-## Notes
-
-- **Backup MongoDB Atlas monthly** — free tier has no automated backups.
-- **1000-row cap** per filtered query.
-- No currency setting — `$` is hardcoded.
-- Filter resets to current month on app restart.
 
 ---
 
